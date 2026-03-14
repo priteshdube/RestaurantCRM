@@ -1,0 +1,7 @@
+fastapi
+uvicorn[standard]
+supabase
+python-jose[cryptography]   # for Clerk JWT verification
+httpx
+pydantic-settings
+python-dotenv
