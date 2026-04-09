@@ -247,7 +247,7 @@ export default function InventoryPage() {
                         size="sm"
                         variant="outline"
                         className="rounded-lg border-stone-200 text-stone-600 hover:text-emerald-700 hover:border-emerald-300 hover:bg-emerald-50 h-8 text-xs"
-                        onClick={() => router.push(`/dashboard/inventory/${item.id}`)}
+                        onClick={() => router.push(`/inventory/${item.id}`)}
                       >
                         View
                       </Button>
