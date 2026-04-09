@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import inventory
+from app.routers import inventory, categories, suppliers
 from app.core.auth import get_current_user
 
 
@@ -21,6 +21,8 @@ async def override_auth():
 app.dependency_overrides[get_current_user] = override_auth
 
 app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
+app.include_router(categories.router, prefix="/api/categories", tags=["categories"])
+app.include_router(suppliers.router, prefix="/api/suppliers", tags=["suppliers"])
 
 @app.get("/health")
 def health():
