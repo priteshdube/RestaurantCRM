@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import { Pencil, X, Check } from "lucide-react"
 
 type Item = {
   id: string
@@ -33,6 +34,8 @@ type Item = {
   cost_per_unit: number
   status: string
   expiry_date: string
+  category_id: string | null
+  supplier_id: string | null
   categories: { name: string } | null
   suppliers: { name: string } | null
 }
@@ -44,6 +47,20 @@ type Movement = {
   reason: string
   performed_by: string
   created_at: string
+}
+
+type Category = { id: string; name: string }
+type Supplier = { id: string; name: string }
+
+type EditForm = {
+  name: string
+  sku: string
+  unit: string
+  category_id: string
+  supplier_id: string
+  reorder_threshold: string
+  cost_per_unit: string
+  expiry_date: string
 }
 
 const statusBadge = (status: string) => {
@@ -103,6 +120,23 @@ export default function ItemDetailPage() {
   const [movements, setMovements] = useState<Movement[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [categories, setCategories] = useState<Category[]>([])
+  const [suppliers, setSuppliers] = useState<Supplier[]>([])
+
+  const [isEditing, setIsEditing] = useState(false)
+  const [editForm, setEditForm] = useState<EditForm>({
+    name: "",
+    sku: "",
+    unit: "",
+    category_id: "",
+    supplier_id: "",
+    reorder_threshold: "",
+    cost_per_unit: "",
+    expiry_date: "",
+  })
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState("")
+
   const [adjustForm, setAdjustForm] = useState({
     movement_type: "received",
     quantity_change: "",
@@ -113,6 +147,7 @@ export default function ItemDetailPage() {
 
   useEffect(() => {
     fetchData()
+    fetchDropdowns()
   }, [id])
 
   async function fetchData() {
@@ -130,7 +165,68 @@ export default function ItemDetailPage() {
     }
   }
 
-  async function handleAdjust(e: React.FormEvent) {
+  async function fetchDropdowns() {
+    try {
+      const [catRes, supRes] = await Promise.all([
+        api.get("/api/categories/"),
+        api.get("/api/suppliers/"),
+      ])
+      setCategories(catRes.data)
+      setSuppliers(supRes.data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  function startEditing() {
+    if (!item) return
+    setEditForm({
+      name: item.name ?? "",
+      sku: item.sku ?? "",
+      unit: item.unit ?? "",
+      category_id: item.category_id ?? "",
+      supplier_id: item.supplier_id ?? "",
+      reorder_threshold: String(item.reorder_threshold ?? ""),
+      cost_per_unit: String(item.cost_per_unit ?? ""),
+      expiry_date: item.expiry_date ?? "",
+    })
+    setSaveError("")
+    setIsEditing(true)
+  }
+
+  function cancelEditing() {
+    setIsEditing(false)
+    setSaveError("")
+  }
+
+  async function handleSave(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    setSaving(true)
+    setSaveError("")
+
+    const payload: Record<string, any> = {
+      name: editForm.name || undefined,
+      sku: editForm.sku || undefined,
+      unit: editForm.unit || undefined,
+      category_id: editForm.category_id || null,
+      supplier_id: editForm.supplier_id || null,
+      reorder_threshold: editForm.reorder_threshold !== "" ? parseFloat(editForm.reorder_threshold) : undefined,
+      cost_per_unit: editForm.cost_per_unit !== "" ? parseFloat(editForm.cost_per_unit) : undefined,
+      expiry_date: editForm.expiry_date || null,
+    }
+
+    try {
+      await api.patch(`/api/inventory/${id}`, payload)
+      await fetchData()
+      setIsEditing(false)
+    } catch (err: any) {
+      setSaveError(err.response?.data?.detail ?? "Failed to save changes. Try again.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleAdjust(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setAdjusting(true)
     setAdjustError("")
@@ -203,61 +299,236 @@ export default function ItemDetailPage() {
             <p className="text-xs text-stone-400 font-mono mt-0.5">SKU: {item.sku}</p>
           )}
         </div>
-        {statusBadge(item.status)}
+        <div className="flex items-center gap-2">
+          {statusBadge(item.status)}
+          {!isEditing && (
+            <Button
+              onClick={startEditing}
+              size="sm"
+              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white gap-1.5 shadow-sm"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              Edit
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Item info card */}
         <div className="rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-stone-100 bg-stone-50">
-            <h3 className="text-sm font-semibold text-stone-700">Item details</h3>
+          <div className="px-6 py-4 border-b border-stone-100 bg-stone-50 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-stone-700">
+              {isEditing ? "Edit item details" : "Item details"}
+            </h3>
+            {isEditing && (
+              <button
+                onClick={cancelEditing}
+                className="text-stone-400 hover:text-stone-600 transition-colors"
+                type="button"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
-          <div className="px-6 py-4 space-y-3">
-            {[
-              { label: "Category", value: item.categories?.name ?? "—" },
-              { label: "Supplier", value: item.suppliers?.name ?? "—" },
-              { label: "Unit", value: item.unit },
-              {
-                label: "Current quantity",
-                value: (
-                  <span
-                    className={
-                      item.quantity <= item.reorder_threshold
-                        ? "text-amber-600 font-semibold"
-                        : "text-stone-900 font-semibold"
-                    }
-                  >
-                    {item.quantity} {item.unit}
-                  </span>
-                ),
-              },
-              {
-                label: "Reorder threshold",
-                value: `${item.reorder_threshold} ${item.unit}`,
-              },
-              {
-                label: "Cost per unit",
-                value: `$${item.cost_per_unit}`,
-              },
-              {
-                label: "Total value",
-                value: (
-                  <span className="font-semibold text-emerald-700">
-                    ${(item.quantity * item.cost_per_unit).toFixed(2)}
-                  </span>
-                ),
-              },
-              {
-                label: "Expiry date",
-                value: item.expiry_date ?? "—",
-              },
-            ].map(({ label, value }) => (
-              <div key={label} className="flex justify-between items-center text-sm py-1 border-b border-stone-50 last:border-0">
-                <span className="text-stone-400 text-xs font-medium uppercase tracking-wider">{label}</span>
-                <span className="text-stone-800">{value}</span>
+
+          {isEditing ? (
+            <form onSubmit={handleSave} className="px-6 py-5 space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Name</Label>
+                <Input
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm((p) => ({ ...p, name: e.target.value }))}
+                  className="rounded-xl border-stone-200 focus-visible:ring-emerald-500"
+                />
               </div>
-            ))}
-          </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">SKU</Label>
+                <Input
+                  value={editForm.sku}
+                  onChange={(e) => setEditForm((p) => ({ ...p, sku: e.target.value }))}
+                  className="rounded-xl border-stone-200 focus-visible:ring-emerald-500"
+                  placeholder="Optional"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Unit</Label>
+                <Input
+                  required
+                  value={editForm.unit}
+                  onChange={(e) => setEditForm((p) => ({ ...p, unit: e.target.value }))}
+                  className="rounded-xl border-stone-200 focus-visible:ring-emerald-500"
+                  placeholder="e.g. kg, liters, pcs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Category</Label>
+                <Select
+                  value={editForm.category_id || "__none__"}
+                  onValueChange={(val) =>
+                    setEditForm((p) => ({ ...p, category_id: val === "__none__" ? "" : val }))
+                  }
+                >
+                  <SelectTrigger className="rounded-xl border-stone-200 focus:ring-emerald-500">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {categories.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Supplier</Label>
+                <Select
+                  value={editForm.supplier_id || "__none__"}
+                  onValueChange={(val) =>
+                    setEditForm((p) => ({ ...p, supplier_id: val === "__none__" ? "" : val }))
+                  }
+                >
+                  <SelectTrigger className="rounded-xl border-stone-200 focus:ring-emerald-500">
+                    <SelectValue placeholder="Select supplier" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {suppliers.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Reorder threshold</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.reorder_threshold}
+                    onChange={(e) => setEditForm((p) => ({ ...p, reorder_threshold: e.target.value }))}
+                    className="rounded-xl border-stone-200 focus-visible:ring-emerald-500"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Cost per unit ($)</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={editForm.cost_per_unit}
+                    onChange={(e) => setEditForm((p) => ({ ...p, cost_per_unit: e.target.value }))}
+                    className="rounded-xl border-stone-200 focus-visible:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-stone-500 uppercase tracking-wider">Expiry date</Label>
+                <Input
+                  type="date"
+                  value={editForm.expiry_date}
+                  onChange={(e) => setEditForm((p) => ({ ...p, expiry_date: e.target.value }))}
+                  className="rounded-xl border-stone-200 focus-visible:ring-emerald-500"
+                />
+              </div>
+
+              {saveError && (
+                <div className="flex items-start gap-2 rounded-xl bg-red-50 border border-red-100 px-3 py-2.5">
+                  <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-sm text-red-600">{saveError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <Button
+                  type="submit"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-10 gap-2 shadow-sm"
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                      </svg>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4" />
+                      Save changes
+                    </>
+                  )}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={cancelEditing}
+                  className="rounded-xl border-stone-200 text-stone-600 hover:bg-stone-50"
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <div className="px-6 py-4 space-y-3">
+              {[
+                { label: "Category", value: item.categories?.name ?? "—" },
+                { label: "Supplier", value: item.suppliers?.name ?? "—" },
+                { label: "Unit", value: item.unit },
+                {
+                  label: "Current quantity",
+                  value: (
+                    <span
+                      className={
+                        item.quantity <= item.reorder_threshold
+                          ? "text-amber-600 font-semibold"
+                          : "text-stone-900 font-semibold"
+                      }
+                    >
+                      {item.quantity} {item.unit}
+                    </span>
+                  ),
+                },
+                {
+                  label: "Reorder threshold",
+                  value: `${item.reorder_threshold} ${item.unit}`,
+                },
+                {
+                  label: "Cost per unit",
+                  value: `$${item.cost_per_unit}`,
+                },
+                {
+                  label: "Total value",
+                  value: (
+                    <span className="font-semibold text-emerald-700">
+                      ${(item.quantity * item.cost_per_unit).toFixed(2)}
+                    </span>
+                  ),
+                },
+                {
+                  label: "Expiry date",
+                  value: item.expiry_date ?? "—",
+                },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between items-center text-sm py-1 border-b border-stone-50 last:border-0">
+                  <span className="text-stone-400 text-xs font-medium uppercase tracking-wider">{label}</span>
+                  <span className="text-stone-800">{value}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Adjust stock card */}

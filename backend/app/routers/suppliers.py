@@ -12,12 +12,19 @@ async def get_suppliers(user=Depends(get_current_user)):
 
 @router.get("/{supplier_id}")
 async def get_supplier(supplier_id: str, user=Depends(get_current_user)):
-    result = supabase.table("suppliers").select("*").eq("id", supplier_id).single().execute()
+    supplier_result = supabase.table("suppliers").select("*").eq("id", supplier_id).single().execute()
 
-    if not result.data:
+    if not supplier_result.data:
         raise HTTPException(status_code=404, detail="Supplier not found")
 
-    return result.data
+    items_result = supabase.table("inventory_items").select(
+        "id, name, quantity, unit, status"
+    ).eq("supplier_id", supplier_id).eq("is_active", True).execute()
+
+    supplier = supplier_result.data
+    supplier["inventory_items"] = items_result.data or []
+
+    return supplier
 
 @router.post("/")
 async def create_supplier(supplier: SupplierCreate, user=Depends(get_current_user)):
