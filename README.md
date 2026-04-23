@@ -267,35 +267,6 @@ All endpoints require a valid Supabase JWT passed as `Authorization: Bearer <tok
 
 ---
 
-## Deployment
-
-### Backend — Render
-
-1. Push your code to GitHub
-2. Go to [render.com](https://render.com) → New → Web Service
-3. Connect your GitHub repo, select the `backend/` folder as the root
-4. Set the following:
-   - **Build command:** `pip install -r requirements.txt`
-   - **Start command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-5. Add environment variables:
-   - `SUPABASE_URL`
-   - `SUPABASE_SERVICE_KEY`
-6. Deploy — note the URL (e.g. `https://freshtrack-api.onrender.com`)
-
-### Frontend — Vercel
-
-1. Go to [vercel.com](https://vercel.com) → New Project → Import from GitHub
-2. Select the repo, set **Root Directory** to `frontend`
-3. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_API_URL` → set to your Render backend URL
-4. Deploy
-
-> After deploying the frontend, update the CORS `allow_origins` in `backend/app/main.py` to include your Vercel URL, then redeploy the backend.
-
----
-
 ## Author
 
 **Pritesh Dube** — Senior Seminar Project, Spring 2026
