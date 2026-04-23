@@ -14,7 +14,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:3000",
-        "https://restaurant-crm-nine.vercel.app/",
+        "https://restaurant-crm-nine.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
