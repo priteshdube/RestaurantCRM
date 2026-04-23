@@ -5,21 +5,56 @@ from app.models.order import OrderCreate, OrderStatusUpdate
 
 router = APIRouter()
 
+# @router.get("/")
+# async def get_orders(user=Depends(get_current_user)):
+#     result = supabase.table("purchase_orders").select(
+#         "*, suppliers(name)"
+#     ).order("created_at", desc=True).execute()
+#     return result.data
+
 @router.get("/")
 async def get_orders(user=Depends(get_current_user)):
     result = supabase.table("purchase_orders").select(
         "*, suppliers(name)"
-    ).order("created_at", desc=True).execute()
+    ).eq("user_id", user["user_id"]).order("created_at", desc=True).execute()
     return result.data
+
 
 @router.get("/{order_id}")
 async def get_order(order_id: str, user=Depends(get_current_user)):
     result = supabase.table("purchase_orders").select(
         "*, suppliers(name), purchase_order_items(*, inventory_items(name, unit))"
-    ).eq("id", order_id).single().execute()
+    ).eq("id", order_id).eq("user_id", user["user_id"]).single().execute()
     if not result.data:
         raise HTTPException(status_code=404, detail="Order not found")
     return result.data
+
+# @router.post("/")
+# async def create_order(order: OrderCreate, user=Depends(get_current_user)):
+#     total_cost = sum(i.quantity_ordered * i.unit_cost for i in order.items)
+
+#     order_result = supabase.table("purchase_orders").insert({
+#         "supplier_id": str(order.supplier_id),
+#         "notes": order.notes,
+#         "total_cost": total_cost,
+#         "created_by": user["user_id"],
+#         "status": "draft"
+#     }).execute()
+
+#     order_id = order_result.data[0]["id"]
+
+#     order_items = [
+#         {
+#             "order_id": order_id,
+#             "item_id": str(i.item_id),
+#             "quantity_ordered": i.quantity_ordered,
+#             "unit_cost": i.unit_cost,
+#         }
+#         for i in order.items
+#     ]
+#     supabase.table("purchase_order_items").insert(order_items).execute()
+
+#     return order_result.data[0]
 
 @router.post("/")
 async def create_order(order: OrderCreate, user=Depends(get_current_user)):
@@ -30,11 +65,11 @@ async def create_order(order: OrderCreate, user=Depends(get_current_user)):
         "notes": order.notes,
         "total_cost": total_cost,
         "created_by": user["user_id"],
+        "user_id": user["user_id"],
         "status": "draft"
     }).execute()
 
     order_id = order_result.data[0]["id"]
-
     order_items = [
         {
             "order_id": order_id,
@@ -45,7 +80,6 @@ async def create_order(order: OrderCreate, user=Depends(get_current_user)):
         for i in order.items
     ]
     supabase.table("purchase_order_items").insert(order_items).execute()
-
     return order_result.data[0]
 
 @router.patch("/{order_id}/status")
@@ -62,7 +96,10 @@ async def update_order_status(
     if body.status == "received":
         order = supabase.table("purchase_orders").select(
             "status"
-        ).eq("id", order_id).single().execute()
+        ).eq("id", order_id).eq("user_id", user["user_id"]).single().execute()
+
+        if not order.data:
+            raise HTTPException(status_code=404, detail="Order not found")
 
         if order.data["status"] == "received":
             raise HTTPException(
@@ -101,7 +138,7 @@ async def update_order_status(
 
     supabase.table("purchase_orders").update(
         {"status": body.status}
-    ).eq("id", order_id).execute()
+    ).eq("id", order_id).eq("user_id", user["user_id"]).execute()
 
     return {"message": f"Order marked as {body.status}"}
 
@@ -109,7 +146,10 @@ async def update_order_status(
 async def delete_order(order_id: str, user=Depends(get_current_user)):
     order = supabase.table("purchase_orders").select(
         "status"
-    ).eq("id", order_id).single().execute()
+    ).eq("id", order_id).eq("user_id", user["user_id"]).single().execute()
+
+    if not order.data:
+        raise HTTPException(status_code=404, detail="Order not found")
 
     if order.data["status"] not in ["draft", "cancelled"]:
         raise HTTPException(
@@ -117,5 +157,5 @@ async def delete_order(order_id: str, user=Depends(get_current_user)):
             detail="Only draft or cancelled orders can be deleted"
         )
 
-    supabase.table("purchase_orders").delete().eq("id", order_id).execute()
+    supabase.table("purchase_orders").delete().eq("id", order_id).eq("user_id", user["user_id"]).execute()
     return {"message": "Order deleted"}
