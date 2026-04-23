@@ -15,23 +15,30 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   async function handleLogin(e: React.FormEvent) {
-    e.preventDefault()
-    setLoading(true)
-    setError("")
+  e.preventDefault()
+  setLoading(true)
+  setError("")
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-      return
-    }
-
-    router.push("/dashboard")
+  if (error) {
+    setError(error.message)
+    setLoading(false)
+    return
   }
+
+  console.log("session after login:", data.session)  // add this temporarily
+
+  if (data.session) {
+    router.push("/dashboard")
+  } else {
+    setError("Login failed. Please try again.")
+    setLoading(false)
+  }
+}
 
   return (
     <div className="min-h-screen flex">

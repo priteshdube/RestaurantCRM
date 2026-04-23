@@ -64,19 +64,35 @@ export default function DashboardLayout({
   const [userEmail, setUserEmail] = useState("")
   const [loading, setLoading] = useState(true)
 
+  // useEffect(() => {
+  //   async function checkAuth() {
+  //     const { data: { session } } = await supabase.auth.getSession()
+  //     if (!session) {
+  //       setLoading(false)
+  //       router.push("/signin")
+  //       return
+  //     }
+  //     setUserEmail(session.user.email ?? "")
+  //     setLoading(false)
+  //   }
+  //   checkAuth()
+  // }, [router])
+
   useEffect(() => {
-    async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        setLoading(false)
-        router.push("/signin")
-        return
-      }
-      setUserEmail(session.user.email ?? "")
-      setLoading(false)
+  async function checkAuth() {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    console.log("session in dashboard:", session)  // add this temporarily
+
+    if (!session) {
+      router.push("/signin")
+      return
     }
-    checkAuth()
-  }, [router])
+    setUserEmail(session.user.email ?? "")
+    setLoading(false)
+  }
+  checkAuth()
+}, [router])
 
   async function handleLogout() {
     await supabase.auth.signOut()
